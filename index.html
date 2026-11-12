@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>e-Toll Tracker - Cek Saldo & Riwayat</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Animasi efek kilau pada kartu virtual */
+        .card-shine {
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 60%);
+        }
+        /* Animasi radar NFC */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+        .nfc-pulse {
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="bg-blue-600 text-white p-2 rounded-xl shadow-sm">
+                    <i data-lucide="credit-card" class="w-5 h-5"></i>
+                </div>
+                <span class="font-bold text-lg tracking-tight text-slate-900">e-Toll<span class="text-blue-600">Check</span></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="openUsbReaderModal()" class="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium text-sm px-3.5 py-2 rounded-xl transition-colors">
+                    <i data-lucide="usb" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">USB Reader (ACR122U)</span>
+                </button>
+                <button onclick="openScanModal()" class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium text-sm px-3.5 py-2 rounded-xl transition-colors">
+                    <i data-lucide="wifi" class="w-4 h-4 rotate-90"></i>
+                    <span class="hidden sm:inline">Scan NFC</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+
+        <!-- Pemberitahuan / Toast Message Box -->
+        <div id="toastBox" class="hidden fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm transition-all duration-300">
+            <i id="toastIcon" data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            <span id="toastMessage">Notifikasi</span>
+        </div>
+
+        <!-- Bagian Atas: Input Nomor Kartu & Sinkronisasi Data -->
+        <section class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900">Cek & Sinkronisasi Data e-Toll</h1>
+                    <p class="text-sm text-slate-500">Tempelkan kartu via NFC atau masukkan nomor kartu untuk mengelola data asli kartu Anda.</p>
+                </div>
+                <!-- Tombol Sinkronisasi Data Riil -->
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="openSyncModal()" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition">
+                        <i data-lucide="file-plus-2" class="w-4 h-4"></i>
+                        <span>Input / Sinkron Data Kartu</span>
+                    </button>
+                </div>
+            </div>
+
+            <form id="cardForm" onsubmit="handleCheckCard(event)" class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <i data-lucide="hash" class="w-5 h-5"></i>
+                    </div>
+                    <input 
+                        type="text" 
+                        id="cardNumberInput" 
+                        maxlength="19" 
+                        placeholder="Masukkan 10 digit (Flazz) atau 16 digit nomor kartu" 
+                        class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+                        oninput="formatCardNumber(this)"
+                        required
+                    >
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2 shrink-0">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                    <span>Buka Kartu</span>
+                </button>
+            </form>
+
+            <!-- Info Teknis Transparan -->
+            <div class="mt-4 p-3 rounded-xl bg-indigo-50/80 border border-indigo-200/80 flex items-start gap-2.5 text-xs text-indigo-900">
+                <i data-lucide="cpu" class="w-4 h-4 text-indigo-600 shrink-0 mt-0.5"></i>
+                <p>
+                    <strong>Dukungan Pembaca Kartu USB (ACR122U / CCID):</strong> Di komputer/laptop (Chrome/Edge), klik <strong>USB Reader (ACR122U)</strong> untuk menghubungkan alat NFC USB via <em>WebUSB</em> dan mengirim perintah <strong>ISO 7816-4 APDU</strong> langsung ke chip kartu untuk membaca UID, saldo, dan log mutasi.
+                </p>
+            </div>
+        </section>
+
+        <!-- Bagian Tengah: Kartu Virtual & Ringkasan -->
+        <section id="cardDisplaySection" class="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+            
+            <!-- Visual Kartu e-Toll -->
+            <div class="md:col-span-7">
+                <div id="virtualCard" class="relative overflow-hidden rounded-2xl p-6 sm:p-7 text-white shadow-lg transition-all duration-500 bg-gradient-to-br from-slate-800 via-slate-900 to-blue-950 h-full flex flex-col justify-between min-h-[210px]">
+                    <div class="card-shine absolute inset-0 pointer-events-none"></div>
+                    
+                    <!-- Header Kartu -->
+                    <div class="flex justify-between items-start relative z-10">
+                        <div>
+                            <span id="cardProviderBadge" class="inline-block px-2.5 py-1 rounded-md bg-white/15 backdrop-blur-sm text-xs font-semibold tracking-wider uppercase">
+                                BELUM ADA KARTU
+                            </span>
+                            <p class="text-xs text-slate-300 mt-2">Saldo Tersedia</p>
+                            <h2 id="cardBalanceDisplay" class="text-3xl sm:text-4xl font-bold tracking-tight mt-0.5">
+                                Rp 0
+                            </h2>
+                        </div>
+                        <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm">
+                            <i data-lucide="wifi" class="w-6 h-6 rotate-90 text-white/90"></i>
+                        </div>
+                    </div>
+
+                    <!-- Footer Kartu -->
+                    <div class="mt-8 pt-4 border-t border-white/10 flex flex-wrap items-end justify-between gap-2 relative z-10">
+                        <div>
+                            <p class="text-[11px] uppercase tracking-wider text-slate-400">Nomor Kartu</p>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <p id="cardNumberDisplay" class="font-mono text-base sm:text-lg tracking-widest text-white/95">
+                                    •••• •••• •••• ••••
+                                </p>
+                                <button id="copyCardBtn" onclick="copyCardNumber()" title="Salin Nomor Kartu" class="hidden text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+                                    <i data-lucide="copy" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[11px] text-slate-400">Update Terakhir</p>
+                            <p id="lastUpdatedDisplay" class="text-xs font-medium text-slate-200">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Ringkasan Data Masuk & Keluar -->
+            <div class="md:col-span-5 flex flex-col justify-between gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex-1 flex flex-col justify-center">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Ringkasan Mutasi</h3>
+                        <span id="periodLabelDisplay" class="text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Semua Waktu</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                            <div class="flex items-center gap-1.5 text-emerald-600 text-xs font-medium mb-1">
+                                <i data-lucide="arrow-down-left" class="w-3.5 h-3.5"></i>
+                                <span>Data Masuk</span>
+                            </div>
+                            <p id="totalInDisplay" class="text-base sm:text-lg font-bold text-slate-900">Rp 0</p>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-rose-50/70 border border-rose-100">
+                            <div class="flex items-center gap-1.5 text-rose-600 text-xs font-medium mb-1">
+                                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+                                <span>Data Keluar</span>
+                            </div>
+                            <p id="totalOutDisplay" class="text-base sm:text-lg font-bold text-slate-900">Rp 0</p>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">
+                        Total mutasi dihitung otomatis berdasarkan filter tanggal dan kategori yang dipilih.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bagian Bawah: Riwayat Transaksi & Filter -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="p-5 sm:p-6 border-b border-slate-100 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Riwayat Mutasi Kartu</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Catatan data masuk dan data keluar yang sesuai dengan kartu Anda</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Filter Jenis Mutasi -->
+                        <div class="flex bg-slate-100 p-1 rounded-xl">
+                            <button onclick="filterTransactions('all')" id="filter-all" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-sm transition">
+                                Semua
+                            </button>
+                            <button onclick="filterTransactions('in')" id="filter-in" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition">
+                                Data Masuk
+                            </button>
+                            <button onclick="filterTransactions('out')" id="filter-out" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition">
+                                Data Keluar
+                            </button>
+                        </div>
+                        <button onclick="openSyncModal()" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition shadow-sm">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>Tambah Catatan</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Baris Filter Periode & Tanggal -->
+                <div class="pt-3 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <!-- Preset Cepat: Semua, Mingguan, Bulanan -->
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-xs font-medium text-slate-500 mr-1">Periode:</span>
+                        <button onclick="setDatePreset('all')" id="preset-all" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white transition">
+                            Semua
+                        </button>
+                        <button onclick="setDatePreset('weekly')" id="preset-weekly" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            Mingguan (7 Hari)
+                        </button>
+                        <button onclick="setDatePreset('monthly')" id="preset-monthly" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            Bulanan (30 Hari)
+                        </button>
+                    </div>
+
+                    <!-- Rentang Tanggal Awal & Akhir -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex items-center gap-1.5">
+                            <label for="startDateInput" class="text-xs text-slate-500">Dari:</label>
+                            <input type="date" id="startDateInput" onchange="handleCustomDateChange()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <label for="endDateInput" class="text-xs text-slate-500">Sampai:</label>
+                            <input type="date" id="endDateInput" onchange="handleCustomDateChange()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <button onclick="resetDateFilter()" title="Reset Tanggal" class="text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daftar Transaksi -->
+            <div id="transactionList" class="divide-y divide-slate-100">
+                <!-- Item transaksi akan dirender via JavaScript -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Sinkronisasi / Input Data Asli Kartu -->
+    <div id="syncModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeSyncModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-900">Input / Sinkron Data Asli Kartu</h3>
+            <p class="text-xs text-slate-500 mt-1 mb-4">
+                Sesuaikan saldo saat ini dan tambahkan mutasi masuk/keluar sesuai data fisik pada e-Money / Flazz Anda.
+            </p>
+
+            <form onsubmit="handleSaveRealData(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nomor Kartu e-Toll</label>
+                    <input type="text" id="syncCardNumber" maxlength="19" oninput="formatCardNumber(this)" placeholder="Contoh: 3131 5930 23" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Sisa Saldo Aktual di Kartu (Rp)</label>
+                    <input type="number" id="syncCurrentBalance" min="0" step="100" placeholder="Contoh: 125000" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100">
+                    <p class="text-xs font-semibold text-slate-700 mb-2">Tambah Catatan Mutasi (Opsional)</p>
+                    <div class="grid grid-cols-2 gap-2 mb-2.5">
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">Jenis Data</label>
+                            <select id="syncTrxType" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="out">Data Keluar (Bayar Tol/Merchant)</option>
+                                <option value="in">Data Masuk (Top Up / Isi Ulang)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">Nominal Mutasi (Rp)</label>
+                            <input type="number" id="syncTrxAmount" min="0" step="100" placeholder="Contoh: 15000" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mb-2.5">
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">Keterangan / Gerbang Tol</label>
+                            <input type="text" id="syncTrxTitle" placeholder="Contoh: GT Waru Utama" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">Tanggal Transaksi</label>
+                            <input type="date" id="syncTrxDate" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-2">
+                    <button type="button" onclick="closeSyncModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-3 rounded-xl transition">
+                        Batal
+                    </button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-3 rounded-xl transition shadow-sm">
+                        Simpan Data Kartu
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Scan NFC -->
+    <div id="scanModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl relative">
+            <button onclick="closeScanModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="my-6 relative flex items-center justify-center">
+                <div class="w-24 h-24 rounded-full bg-blue-100 absolute nfc-pulse"></div>
+                <div class="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center relative z-10 shadow-lg">
+                    <i data-lucide="smartphone-nfc" class="w-10 h-10"></i>
+                </div>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900">Tempelkan Kartu e-Toll</h3>
+            <p id="nfcStatusText" class="text-sm text-slate-500 mt-2 mb-4">
+                Tempelkan kartu e-Money, Flazz, atau BRIZZI di bagian belakang smartphone Android Anda untuk membaca UID chip NFC secara langsung.
+            </p>
+            
+            <!-- Kotak Hasil Pembacaan Chip NFC Asli -->
+            <div id="nfcRawOutput" class="hidden mb-4 p-3 rounded-xl bg-slate-900 text-left font-mono text-xs text-emerald-400 overflow-x-auto">
+                <p class="text-slate-400 text-[10px] uppercase mb-1">Data Chip Terbaca (Web NFC):</p>
+                <div id="nfcRawDetails"></div>
+            </div>
+
+            <div class="space-y-2.5">
+                <button id="startNfcBtn" onclick="startRealNfcScan()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+                    <i data-lucide="wifi" class="w-4 h-4 rotate-90"></i>
+                    <span>Aktifkan Sensor NFC Asli</span>
+                </button>
+                <button onclick="closeScanModal(); openSyncModal();" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-2.5 rounded-xl transition">
+                    Input Saldo & Mutasi Secara Manual
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal WebUSB Smart Card Reader (ACR122U / CCID APDU Console) -->
+    <div id="usbReaderModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <button onclick="closeUsbReaderModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                    <i data-lucide="usb" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">USB Smart Card Reader (ACR122U)</h3>
+                    <p class="text-xs text-slate-500">Komunikasi langsung ISO 7816-4 APDU melalui protokol WebUSB CCID</p>
+                </div>
+            </div>
+
+            <!-- Status Koneksi Perangkat -->
+            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <span id="usbStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                    <div>
+                        <p id="usbDeviceName" class="text-xs font-bold text-slate-800">Belum ada reader terhubung</p>
+                        <p id="usbDeviceSub" class="text-[11px] text-slate-500">Colokkan ACR122U / reader CCID ke port USB</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="connectUsbBtn" onclick="connectUsbReader()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-sm">
+                        Hubungkan Reader
+                    </button>
+                    <button id="disconnectUsbBtn" onclick="disconnectUsbReader()" class="hidden bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold px-3 py-2 rounded-xl transition">
+                        Putus
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preset Perintah APDU e-Toll -->
+            <div class="space-y-3 mb-4">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-semibold text-slate-700">Perintah Cepat (Preset APDU)</label>
+                    <span class="text-[11px] text-slate-400">Hexadecimal (ISO 7816-4)</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="runPresetApdu('get_uid')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                        <p class="text-xs font-semibold text-slate-800">1. Baca UID & ATR Kartu</p>
+                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">FF CA 00 00 00</p>
+                    </button>
+                    <button type="button" onclick="runPresetApdu('read_emoney')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                        <p class="text-xs font-semibold text-slate-800">2. Baca Saldo & Log e-Money</p>
+                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">SELECT AID + GET BALANCE</p>
+                    </button>
+                    <button type="button" onclick="runPresetApdu('read_flazz')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                        <p class="text-xs font-semibold text-slate-800">3. Baca Info BCA Flazz</p>
+                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">00 A4 04 00 + READ REC</p>
+                    </button>
+                    <button type="button" onclick="runPresetApdu('power_on')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                        <p class="text-xs font-semibold text-slate-800">0. Aktivasi Daya ICC (Reset)</p>
+                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">PC_to_RDR_IccPowerOn</p>
+                    </button>
+                </div>
+
+                <!-- Input Custom APDU -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Kirim Perintah APDU Manual (Hex)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="customApduInput" value="FF CA 00 00 00" placeholder="Contoh: FF CA 00 00 00" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button type="button" onclick="sendCustomApduCommand()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition">
+                            Kirim APDU
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Konsol Log APDU TX / RX -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold text-slate-700">Log Komunikasi APDU (TX / RX)</span>
+                    <button type="button" onclick="clearApduConsole()" class="text-[11px] text-slate-400 hover:text-slate-600">Bersihkan Log</button>
+                </div>
+                <div id="apduConsoleLog" class="bg-slate-950 text-slate-200 font-mono text-[11px] p-3.5 rounded-2xl h-44 overflow-y-auto space-y-1.5 leading-relaxed">
+                    <div class="text-slate-500">// Siap. Hubungkan reader ACR122U lalu tempelkan kartu di atas reader...</div>
+                </div>
+            </div>
+
+            <!-- Catatan Driver Windows -->
+            <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">
+                <strong>Catatan OS:</strong> Di Linux/macOS/Android WebUSB langsung berjalan. Di Windows, pastikan driver USB menggunakan <strong>WinUSB</strong> (via Zadig) jika Chrome memblokir antarmuka CCID bawaan sistem.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Inisialisasi ikon Lucide
+        lucide.createIcons();
+
+        // Data Kartu (Hanya menyimpan kartu kosong default dan kartu riil milik pengguna)
+        const cardsDatabase = {
+            'empty': {
+                number: '',
+                provider: 'BELUM ADA KARTU',
+                theme: 'from-slate-700 via-slate-800 to-slate-900',
+                balance: 0,
+                transactions: []
+            }
+        };
+
+        // Deteksi penyedia kartu dari awalan/panjang nomor kartu
+        function detectCardMeta(cleanNumber) {
+            const prefix = cleanNumber.substring(0, 4);
+            if (prefix === '6032') {
+                return { provider: 'MANDIRI E-MONEY', theme: 'from-slate-800 via-slate-900 to-blue-950' };
+            }
+            if (cleanNumber.length === 10 || prefix === '3131' || prefix === '4511' || prefix === '5200') {
+                return { provider: 'BCA FLAZZ', theme: 'from-blue-700 via-blue-800 to-indigo-950' };
+            }
+            if (prefix === '6013') {
+                return { provider: 'BRI BRIZZI', theme: 'from-sky-700 via-blue-900 to-slate-900' };
+            }
+            if (prefix === '7546') {
+                return { provider: 'BNI TAPCASH', theme: 'from-orange-600 via-amber-700 to-slate-900' };
+            }
+            return { provider: 'KARTU E-TOLL / NFC', theme: 'from-emerald-700 via-teal-800 to-slate-900' };
+        }
+
+        // State Aktif (Default kosong)
+        let currentCardKey = 'empty';
+        let currentTypeFilter = 'all';
+        let currentDatePreset = 'all';
+        let filterStartDate = '';
+        let filterEndDate = '';
+
+        // Format Rupiah
+        function formatRupiah(angka) {
+            const absVal = Math.abs(angka);
+            return 'Rp ' + absVal.toLocaleString('id-ID');
+        }
+
+        // Format Tanggal Indonesia dari YYYY-MM-DD
+        function formatIndoDate(isoDate) {
+            if (!isoDate) return '-';
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const [y, m, d] = isoDate.split('-');
+            return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+        }
+
+        // Format Input Nomor Kartu (Spasi tiap 4 digit)
+        function formatCardNumber(input) {
+            let value = input.value.replace(/\D/g, '');
+            let formatted = value.match(/.{1,4}/g)?.join(' ') || '';
+            input.value = formatted;
+        }
+
+        // Filter daftar transaksi berdasarkan jenis (masuk/keluar) dan rentang tanggal
+        function getFilteredTransactions(transactions) {
+            return transactions.filter(trx => {
+                // Filter jenis mutasi
+                if (currentTypeFilter !== 'all' && trx.type !== currentTypeFilter) {
+                    return false;
+                }
+                // Filter tanggal awal
+                if (filterStartDate && trx.isoDate < filterStartDate) {
+                    return false;
+                }
+                // Filter tanggal akhir
+                if (filterEndDate && trx.isoDate > filterEndDate) {
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        // Render Tampilan Kartu & Riwayat
+        function renderDashboard() {
+            const card = cardsDatabase[currentCardKey];
+            const isEmpty = currentCardKey === 'empty';
+            
+            // Update Visual Kartu
+            const virtualCard = document.getElementById('virtualCard');
+            virtualCard.className = `relative overflow-hidden rounded-2xl p-6 sm:p-7 text-white shadow-lg transition-all duration-500 bg-gradient-to-br ${card.theme} h-full flex flex-col justify-between min-h-[210px]`;
+            
+            document.getElementById('cardProviderBadge').textContent = card.provider;
+            document.getElementById('cardBalanceDisplay').textContent = formatRupiah(card.balance);
+            document.getElementById('cardNumberDisplay').textContent = isEmpty ? '•••• •••• •••• ••••' : card.number;
+            
+            const copyBtn = document.getElementById('copyCardBtn');
+            if (isEmpty) {
+                copyBtn.classList.add('hidden');
+            } else {
+                copyBtn.classList.remove('hidden');
+            }
+
+            // Ambil transaksi terfilter berdasarkan tanggal untuk hitung ringkasan
+            const dateFilteredTrx = card.transactions.filter(trx => {
+                if (filterStartDate && trx.isoDate < filterStartDate) return false;
+                if (filterEndDate && trx.isoDate > filterEndDate) return false;
+                return true;
+            });
+
+            // Hitung Ringkasan Data Masuk & Data Keluar
+            let totalIn = 0;
+            let totalOut = 0;
+            dateFilteredTrx.forEach(trx => {
+                if (trx.type === 'in') totalIn += Math.abs(trx.amount);
+                else if (trx.type === 'out') totalOut += Math.abs(trx.amount);
+            });
+
+            document.getElementById('totalInDisplay').textContent = formatRupiah(totalIn);
+            document.getElementById('totalOutDisplay').textContent = formatRupiah(totalOut);
+
+            // Render Daftar Riwayat
+            renderTransactions(getFilteredTransactions(card.transactions));
+        }
+
+        function renderTransactions(filteredList) {
+            const listEl = document.getElementById('transactionList');
+
+            if (currentCardKey === 'empty') {
+                listEl.innerHTML = `
+                    <div class="p-10 text-center text-slate-400">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="credit-card" class="w-6 h-6"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-600">Belum ada data kartu yang dimuat</p>
+                        <p class="text-xs text-slate-400 mt-1">Gunakan Scan NFC atau klik "Input / Sinkron Data Kartu" untuk memasukkan data asli kartu Anda.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            if (filteredList.length === 0) {
+                listEl.innerHTML = `
+                    <div class="p-8 text-center text-slate-400">
+                        <p class="text-sm">Belum ada catatan mutasi masuk/keluar pada kartu ini atau pada rentang tanggal yang dipilih.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = filteredList.map(trx => {
+                const isIn = trx.type === 'in';
+                const iconName = isIn ? 'arrow-down-left' : 'arrow-up-right';
+                const iconBg = isIn ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600';
+                const amountColor = isIn ? 'text-emerald-600' : 'text-rose-600';
+                const amountPrefix = isIn ? '+' : '-';
+
+                return `
+                    <div class="p-4 sm:px-6 hover:bg-slate-50/80 transition flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3.5 min-w-0">
+                            <div class="w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0">
+                                <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-slate-900 truncate">${trx.title}</p>
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 mt-0.5">
+                                    <span>${trx.location}</span>
+                                    <span>•</span>
+                                    <span>${formatIndoDate(trx.isoDate)}, ${trx.time}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p class="text-sm sm:text-base font-bold ${amountColor}">
+                                ${amountPrefix} ${formatRupiah(trx.amount)}
+                            </p>
+                            <span class="inline-block text-[11px] font-medium px-2 py-0.5 rounded-md ${isIn ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'} mt-0.5">
+                                ${isIn ? 'Data Masuk' : 'Data Keluar'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // Ganti Filter Jenis Mutasi (Semua / Masuk / Keluar)
+        function filterTransactions(type) {
+            currentTypeFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition';
+            });
+            const activeBtn = document.getElementById(`filter-${type}`);
+            activeBtn.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-sm transition';
+            
+            renderDashboard();
+        }
+
+        // Filter Preset Periode (Semua / Mingguan / Bulanan)
+        function setDatePreset(preset) {
+            currentDatePreset = preset;
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.className = 'preset-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+            });
+            document.getElementById(`preset-${preset}`).className = 'preset-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white transition';
+
+            const today = new Date();
+            const formatYMD = (d) => d.toISOString().split('T')[0];
+
+            if (preset === 'all') {
+                filterStartDate = '';
+                filterEndDate = '';
+                document.getElementById('periodLabelDisplay').textContent = 'Semua Waktu';
+            } else if (preset === 'weekly') {
+                const weekAgo = new Date(today);
+                weekAgo.setDate(today.getDate() - 7);
+                filterStartDate = formatYMD(weekAgo);
+                filterEndDate = formatYMD(today);
+                document.getElementById('periodLabelDisplay').textContent = '7 Hari Terakhir';
+            } else if (preset === 'monthly') {
+                const monthAgo = new Date(today);
+                monthAgo.setDate(today.getDate() - 30);
+                filterStartDate = formatYMD(monthAgo);
+                filterEndDate = formatYMD(today);
+                document.getElementById('periodLabelDisplay').textContent = '30 Hari Terakhir';
+            }
+
+            document.getElementById('startDateInput').value = filterStartDate;
+            document.getElementById('endDateInput').value = filterEndDate;
+            renderDashboard();
+        }
+
+        // Perubahan Tanggal Awal / Akhir Kustom
+        function handleCustomDateChange() {
+            filterStartDate = document.getElementById('startDateInput').value;
+            filterEndDate = document.getElementById('endDateInput').value;
+
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.className = 'preset-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+            });
+
+            if (filterStartDate && filterEndDate) {
+                document.getElementById('periodLabelDisplay').textContent = `${formatIndoDate(filterStartDate)} - ${formatIndoDate(filterEndDate)}`;
+            } else if (filterStartDate) {
+                document.getElementById('periodLabelDisplay').textContent = `Mulai ${formatIndoDate(filterStartDate)}`;
+            } else if (filterEndDate) {
+                document.getElementById('periodLabelDisplay').textContent = `S/d ${formatIndoDate(filterEndDate)}`;
+            } else {
+                setDatePreset('all');
+                return;
+            }
+
+            renderDashboard();
+        }
+
+        function resetDateFilter() {
+            setDatePreset('all');
+        }
+
+        // Buka & Tutup Modal Sinkronisasi Data Riil
+        function openSyncModal() {
+            const currentCard = cardsDatabase[currentCardKey];
+            document.getElementById('syncCardNumber').value = currentCardKey !== 'empty' ? currentCard.number : document.getElementById('cardNumberInput').value;
+            document.getElementById('syncCurrentBalance').value = currentCardKey !== 'empty' ? currentCard.balance : '';
+            document.getElementById('syncTrxAmount').value = '';
+            document.getElementById('syncTrxTitle').value = '';
+            document.getElementById('syncTrxDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('syncModal').classList.remove('hidden');
+        }
+
+        function closeSyncModal() {
+            document.getElementById('syncModal').classList.add('hidden');
+        }
+
+        // Simpan Data Asli Kartu & Mutasi
+        function handleSaveRealData(e) {
+            e.preventDefault();
+            const rawNum = document.getElementById('syncCardNumber').value.replace(/\s+/g, '');
+            if (rawNum.length < 8) {
+                showToast('Masukkan nomor kartu atau UID chip yang valid.', 'error');
+                return;
+            }
+
+            const balanceVal = parseInt(document.getElementById('syncCurrentBalance').value, 10) || 0;
+            const trxType = document.getElementById('syncTrxType').value;
+            const trxAmount = parseInt(document.getElementById('syncTrxAmount').value, 10) || 0;
+            const trxTitle = document.getElementById('syncTrxTitle').value.trim();
+            const trxDate = document.getElementById('syncTrxDate').value || new Date().toISOString().split('T')[0];
+
+            const cardKey = 'card_' + rawNum;
+            const meta = detectCardMeta(rawNum);
+            const formattedNum = rawNum.match(/.{1,4}/g)?.join(' ') || rawNum;
+
+            if (!cardsDatabase[cardKey]) {
+                cardsDatabase[cardKey] = {
+                    number: formattedNum,
+                    provider: meta.provider,
+                    theme: meta.theme,
+                    balance: balanceVal,
+                    transactions: []
+                };
+            } else {
+                cardsDatabase[cardKey].balance = balanceVal;
+            }
+
+            // Jika user mengisi nominal mutasi baru, tambahkan ke riwayat
+            if (trxAmount > 0) {
+                const nowTime = new Date().toTimeString().slice(0, 5);
+                cardsDatabase[cardKey].transactions.unshift({
+                    id: Date.now(),
+                    type: trxType,
+                    title: trxTitle || (trxType === 'in' ? 'Top Up / Isi Ulang Saldo' : 'Transaksi Gerbang Tol / Merchant'),
+                    location: 'Data Kartu Aktual',
+                    isoDate: trxDate,
+                    time: nowTime,
+                    amount: trxType === 'in' ? trxAmount : -trxAmount
+                });
+            }
+
+            currentCardKey = cardKey;
+            document.getElementById('cardNumberInput').value = formattedNum;
+            updateTimestamp();
+            renderDashboard();
+            closeSyncModal();
+            showToast('Data kartu & mutasi berhasil diperbarui!');
+        }
+
+        // Cek Kartu dari Form Input
+        function handleCheckCard(e) {
+            e.preventDefault();
+            const rawInput = document.getElementById('cardNumberInput').value.replace(/\s+/g, '');
+            if (rawInput.length < 8) {
+                showToast('Masukkan 10 digit (Flazz) atau 16 digit nomor kartu dengan lengkap.', 'error');
+                return;
+            }
+
+            const cardKey = 'card_' + rawInput;
+            if (!cardsDatabase[cardKey]) {
+                const meta = detectCardMeta(rawInput);
+                cardsDatabase[cardKey] = {
+                    number: rawInput.match(/.{1,4}/g)?.join(' ') || rawInput,
+                    provider: meta.provider,
+                    theme: meta.theme,
+                    balance: 0,
+                    transactions: []
+                };
+            }
+
+            currentCardKey = cardKey;
+            updateTimestamp();
+            renderDashboard();
+            showToast('Kartu dibuka. Klik "Input / Sinkron Data Kartu" untuk menyesuaikan saldo & mutasi fisik.');
+        }
+
+        // Modal NFC Scan
+        let nfcAbortController = null;
+
+        function openScanModal() {
+            document.getElementById('scanModal').classList.remove('hidden');
+            document.getElementById('nfcRawOutput').classList.add('hidden');
+            document.getElementById('nfcStatusText').textContent = 
+                'Tempelkan kartu e-Money, Flazz, atau BRIZZI di bagian belakang smartphone Android Anda untuk membaca chip NFC secara langsung.';
+        }
+
+        function closeScanModal() {
+            if (nfcAbortController) {
+                nfcAbortController.abort();
+                nfcAbortController = null;
+            }
+            document.getElementById('scanModal').classList.add('hidden');
+        }
+
+        // Pembacaan Web NFC Asli (Chrome Android)
+        async function startRealNfcScan() {
+            const statusText = document.getElementById('nfcStatusText');
+            const rawOutput = document.getElementById('nfcRawOutput');
+            const rawDetails = document.getElementById('nfcRawDetails');
+
+            if (!('NDEFReader' in window)) {
+                statusText.textContent = 'Browser/perangkat ini tidak mendukung Web NFC (hanya tersedia di Google Chrome Android). Gunakan tombol simulasi di bawah.';
+                showToast('Web NFC hanya didukung di Google Chrome Android.', 'error');
+                return;
+            }
+
+            try {
+                if (nfcAbortController) {
+                    nfcAbortController.abort();
+                }
+                nfcAbortController = new AbortController();
+                const ndef = new NDEFReader();
+
+                statusText.textContent = 'Sensor NFC aktif! Silakan tempelkan kartu e-Toll di belakang HP Anda...';
+                showToast('Sensor NFC aktif, tempelkan kartu sekarang.');
+
+                await ndef.scan({ signal: nfcAbortController.signal });
+
+                ndef.addEventListener('readingerror', () => {
+                    statusText.textContent = 'Gagal membaca chip kartu. Pastikan kartu menempel stabil dan coba lagi.';
+                    showToast('Gagal membaca kartu, coba tempelkan ulang.', 'error');
+                });
+
+                ndef.addEventListener('reading', ({ message, serialNumber }) => {
+                    rawOutput.classList.remove('hidden');
+                    const recordCount = message && message.records ? message.records.length : 0;
+                    rawDetails.innerHTML = `
+                        <div>UID / Serial : ${serialNumber || 'Tidak terbaca'}</div>
+                        <div>NDEF Records : ${recordCount} record(s)</div>
+                        <div>Status Chip  : Terdeteksi (IsoDep/Felica)</div>
+                    `;
+
+                    // Buat profil kartu hasil pembacaan chip NFC asli tanpa angka fiktif
+                    const cleanUid = (serialNumber || 'NFC' + Date.now()).replace(/:/g, '').toUpperCase();
+                    const cardKey = 'card_' + cleanUid;
+
+                    if (!cardsDatabase[cardKey]) {
+                        cardsDatabase[cardKey] = {
+                            number: cleanUid.match(/.{1,4}/g)?.join(' ') || cleanUid,
+                            provider: 'CHIP NFC TERDETEKSI',
+                            theme: 'from-emerald-700 via-teal-800 to-slate-900',
+                            balance: 0,
+                            transactions: []
+                        };
+                    }
+
+                    currentCardKey = cardKey;
+                    document.getElementById('cardNumberInput').value = cardsDatabase[cardKey].number;
+                    updateTimestamp();
+                    renderDashboard();
+                    showToast(`Chip kartu terdeteksi (UID: ${serialNumber}). Silakan lengkapi saldo aktual.`);
+                });
+
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    document.getElementById('nfcStatusText').textContent = 
+                        'Pastikan fitur NFC di pengaturan HP Android Anda sudah dinyalakan, lalu coba lagi.';
+                    showToast('Izin NFC ditolak atau sensor NFC belum aktif.', 'error');
+                }
+            }
+        }
+
+        // =========================================================================
+        // MODUL WEBUSB SMART CARD READER (ACR122U / CCID ISO 7816-4 APDU)
+        // =========================================================================
+        let usbDevice = null;
+        let ccidInterfaceNumber = null;
+        let ccidEndpointIn = null;
+        let ccidEndpointOut = null;
+        let ccidSeq = 0;
+
+        function openUsbReaderModal() {
+            document.getElementById('usbReaderModal').classList.remove('hidden');
+        }
+
+        function closeUsbReaderModal() {
+            document.getElementById('usbReaderModal').classList.add('hidden');
+        }
+
+        function logApdu(message, type = 'info') {
+            const consoleEl = document.getElementById('apduConsoleLog');
+            const line = document.createElement('div');
+            const time = new Date().toTimeString().slice(0, 8);
+            if (type === 'tx') {
+                line.className = 'text-sky-400';
+                line.textContent = `[${time}] >> TX: ${message}`;
+            } else if (type === 'rx') {
+                line.className = 'text-emerald-400';
+                line.textContent = `[${time}] << RX: ${message}`;
+            } else if (type === 'err') {
+                line.className = 'text-rose-400';
+                line.textContent = `[${time}] !! ERR: ${message}`;
+            } else {
+                line.className = 'text-slate-400';
+                line.textContent = `[${time}] # ${message}`;
+            }
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function clearApduConsole() {
+            document.getElementById('apduConsoleLog').innerHTML = '<div class="text-slate-500">// Log dibersihkan.</div>';
+        }
+
+        function hexToBytes(hex) {
+            const clean = hex.replace(/[^0-9A-Fa-f]/g, '');
+            if (clean.length % 2 !== 0) throw new Error('Panjang hex APDU harus genap.');
+            const bytes = new Uint8Array(clean.length / 2);
+            for (let i = 0; i < clean.length; i += 2) {
+                bytes[i / 2] = parseInt(clean.substr(i, 2), 16);
+            }
+            return bytes;
+        }
+
+        function bytesToHex(bytes) {
+            return Array.from(bytes)
+                .map(b => b.toString(16).padStart(2, '0').toUpperCase())
+                .join(' ');
+        }
+
+        // Hubungkan ke ACR122U atau Smart Card Reader CCID via WebUSB
+        async function connectUsbReader() {
+            if (!('usb' in navigator)) {
+                logApdu('Browser ini tidak mendukung WebUSB. Gunakan Google Chrome atau Microsoft Edge di PC.', 'err');
+                showToast('WebUSB hanya didukung di Chrome / Edge Desktop.', 'error');
+                return;
+            }
+
+            try {
+                // Filter ACR122U (Vendor ID 0x072F) atau semua perangkat Smart Card Class (0x0B)
+                usbDevice = await navigator.usb.requestDevice({
+                    filters: [
+                        { vendorId: 0x072f }, // Advanced Card Systems (ACS ACR122U / ACR1252U)
+                        { classCode: 0x0b }   // USB Smart Card Device Class (CCID)
+                    ]
+                });
+
+                await usbDevice.open();
+                if (usbDevice.configuration === null) {
+                    await usbDevice.selectConfiguration(1);
+                }
+
+                // Cari interface CCID (classCode 0x0B) atau interface pertama
+                const interfaces = usbDevice.configuration.interfaces;
+                let targetInterface = interfaces.find(iface =>
+                    iface.alternates.some(alt => alt.interfaceClass === 0x0b)
+                ) || interfaces[0];
+
+                ccidInterfaceNumber = targetInterface.interfaceNumber;
+                await usbDevice.claimInterface(ccidInterfaceNumber);
+
+                const alternate = targetInterface.alternates[0];
+                const epIn = alternate.endpoints.find(ep => ep.direction === 'in' && ep.type === 'bulk');
+                const epOut = alternate.endpoints.find(ep => ep.direction === 'out' && ep.type === 'bulk');
+
+                if (!epIn || !epOut) {
+                    throw new Error('Endpoint Bulk IN/OUT CCID tidak ditemukan pada reader.');
+                }
+
+                ccidEndpointIn = epIn.endpointNumber;
+                ccidEndpointOut = epOut.endpointNumber;
+                ccidSeq = 0;
+
+                // Update UI Status
+                document.getElementById('usbStatusDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
+                document.getElementById('usbDeviceName').textContent = usbDevice.productName || 'USB Smart Card Reader';
+                document.getElementById('usbDeviceSub').textContent = `VID: 0x${usbDevice.vendorId.toString(16).toUpperCase()} • Terhubung (CCID)`;
+                document.getElementById('connectUsbBtn').classList.add('hidden');
+                document.getElementById('disconnectUsbBtn').classList.remove('hidden');
+
+                logApdu(`Terhubung ke ${usbDevice.productName || 'USB Reader'} (Interface #${ccidInterfaceNumber})`);
+                showToast('USB Smart Card Reader berhasil terhubung!');
+
+                // Otomatis nyalakan daya ICC kartu
+                await sendCcidIccPowerOn();
+
+            } catch (err) {
+                if (err.name !== 'NotFoundError') {
+                    logApdu(err.message || 'Gagal membuka perangkat USB.', 'err');
+                    showToast('Gagal menghubungkan USB Reader. Cek izin/driver WinUSB.', 'error');
+                }
+            }
+        }
+
+        async function disconnectUsbReader() {
+            if (usbDevice) {
+                try {
+                    await usbDevice.close();
+                } catch (e) {}
+                usbDevice = null;
+            }
+            document.getElementById('usbStatusDot').className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+            document.getElementById('usbDeviceName').textContent = 'Belum ada reader terhubung';
+            document.getElementById('usbDeviceSub').textContent = 'Colokkan ACR122U / reader CCID ke port USB';
+            document.getElementById('connectUsbBtn').classList.remove('hidden');
+            document.getElementById('disconnectUsbBtn').classList.add('hidden');
+            logApdu('Koneksi USB Reader diputus.');
+        }
+
+        // Paket CCID PC_to_RDR_IccPowerOn (0x62) untuk mengaktifkan chip kartu di atas reader
+        async function sendCcidIccPowerOn() {
+            if (!usbDevice) throw new Error('Reader belum terhubung.');
+            const seq = (ccidSeq++) & 0xff;
+            // Header CCID 10 byte: MsgType=0x62, Length=0, Slot=0, Seq, PowerSelect=0x00 (Auto)
+            const packet = new Uint8Array([0x62, 0x00, 0x00, 0x00, 0x00, 0x00, seq, 0x00, 0x00, 0x00]);
+            logApdu('PC_to_RDR_IccPowerOn (Aktivasi Kartu)', 'tx');
+            await usbDevice.transferOut(ccidEndpointOut, packet);
+
+            const res = await usbDevice.transferIn(ccidEndpointIn, 64);
+            const data = new Uint8Array(res.data.buffer);
+            if (data.length >= 10) {
+                const status = data[7];
+                const error = data[8];
+                if ((status & 0x40) !== 0) {
+                    throw new Error(`Kartu tidak terdeteksi di atas reader (Slot Status: 0x${status.toString(16)}, Err: 0x${error.toString(16)})`);
+                }
+                const atr = data.slice(10);
+                logApdu(`ATR Kartu: ${bytesToHex(atr)}`, 'rx');
+                return atr;
+            }
+            return new Uint8Array();
+        }
+
+        // Bungkus perintah ISO 7816-4 APDU ke dalam frame CCID PC_to_RDR_XfrBlock (0x6F)
+        async function transceiveApdu(apduHex) {
+            if (!usbDevice) {
+                throw new Error('Silakan klik "Hubungkan Reader" terlebih dahulu.');
+            }
+            const apduBytes = hexToBytes(apduHex);
+            const len = apduBytes.length;
+            const seq = (ccidSeq++) & 0xff;
+
+            // Header CCID 10 byte + Payload APDU
+            const frame = new Uint8Array(10 + len);
+            frame[0] = 0x6f; // PC_to_RDR_XfrBlock
+            frame[1] = len & 0xff;
+            frame[2] = (len >> 8) & 0xff;
+            frame[3] = (len >> 16) & 0xff;
+            frame[4] = (len >> 24) & 0xff;
+            frame[5] = 0x00; // Slot 0
+            frame[6] = seq;
+            frame[7] = 0x00; // BWI
+            frame[8] = 0x00; // LevelParameter
+            frame[9] = 0x00;
+            frame.set(apduBytes, 10);
+
+            logApdu(bytesToHex(apduBytes), 'tx');
+            await usbDevice.transferOut(ccidEndpointOut, frame);
+
+            const response = await usbDevice.transferIn(ccidEndpointIn, 256);
+            const raw = new Uint8Array(response.data.buffer);
+
+            if (raw.length < 10) {
+                throw new Error('Respons CCID tidak lengkap.');
+            }
+
+            const slotStatus = raw[7];
+            const slotError = raw[8];
+            if ((slotStatus & 0x40) !== 0) {
+                throw new Error(`Error Reader CCID (Status: 0x${slotStatus.toString(16)}, Error: 0x${slotError.toString(16)})`);
+            }
+
+            const payload = raw.slice(10);
+            logApdu(bytesToHex(payload), 'rx');
+            return payload;
+        }
+
+        // Kirim APDU Manual dari kolom input
+        async function sendCustomApduCommand() {
+            const cmd = document.getElementById('customApduInput').value.trim();
+            if (!cmd) return;
+            try {
+                await transceiveApdu(cmd);
+            } catch (err) {
+                logApdu(err.message, 'err');
+            }
+        }
+
+        // Jalankan rangkaian preset APDU e-Toll
+        async function runPresetApdu(presetType) {
+            try {
+                if (presetType === 'power_on') {
+                    await sendCcidIccPowerOn();
+                    return;
+                }
+
+                if (presetType === 'get_uid') {
+                    // Perintah standar PC/SC Get Data (UID kartu contactless)
+                    const res = await transceiveApdu('FF CA 00 00 00');
+                    if (res.length >= 2) {
+                        const sw1 = res[res.length - 2];
+                        const sw2 = res[res.length - 1];
+                        if (sw1 === 0x90 && sw2 === 0x00) {
+                            const uidBytes = res.slice(0, res.length - 2);
+                            const uidHex = Array.from(uidBytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+                            logApdu(`UID Kartu Berhasil Dibaca: ${uidHex}`);
+                            applyCardFromReader(uidHex, 'KARTU USB READER (UID)', null);
+                        } else {
+                            logApdu(`Status Word: ${sw1.toString(16)} ${sw2.toString(16)}`, 'err');
+                        }
+                    }
+                    return;
+                }
+
+                if (presetType === 'read_emoney') {
+                    // 1. Baca UID dulu
+                    const uidRes = await transceiveApdu('FF CA 00 00 00');
+                    let uidHex = 'EM' + Date.now();
+                    if (uidRes.length > 2 && uidRes[uidRes.length - 2] === 0x90) {
+                        uidHex = Array.from(uidRes.slice(0, -2)).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+                    }
+
+                    // 2. SELECT AID Mandiri e-Money (00 00 00 00 00 00 01)
+                    await transceiveApdu('00 A4 04 00 08 00 00 00 00 00 00 00 01');
+
+                    // 3. GET BALANCE e-Money (00 B3 00 00 3F)
+                    const balRes = await transceiveApdu('00 B3 00 00 3F');
+                    if (balRes.length >= 6 && balRes[balRes.length - 2] === 0x90) {
+                        // Parse 4-byte little-endian balance pada offset standar respon e-Money
+                        const view = new DataView(balRes.buffer, balRes.byteOffset, balRes.byteLength);
+                        const parsedBalance = view.getUint32(0, true);
+                        logApdu(`Saldo Terbaca: Rp ${parsedBalance.toLocaleString('id-ID')}`);
+                        applyCardFromReader(uidHex, 'MANDIRI E-MONEY (USB)', parsedBalance);
+                    } else {
+                        logApdu('Kartu merespons, namun membutuhkan autentikasi SAM/kunci bank untuk mendekripsi blok saldo.', 'info');
+                        applyCardFromReader(uidHex, 'KARTU E-TOLL (USB)', null);
+                    }
+                    return;
+                }
+
+                if (presetType === 'read_flazz') {
+                    const uidRes = await transceiveApdu('FF CA 00 00 00');
+                    let uidHex = 'FLZ' + Date.now();
+                    if (uidRes.length > 2 && uidRes[uidRes.length - 2] === 0x90) {
+                        uidHex = Array.from(uidRes.slice(0, -2)).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+                    }
+
+                    // Select Application / Read Record standar ISO 7816-4 pada kartu Flazz
+                    await transceiveApdu('00 A4 04 00 07 A0 00 00 00 03 00 00');
+                    const recRes = await transceiveApdu('00 B2 01 0C 00');
+                    if (recRes.length >= 6 && recRes[recRes.length - 2] === 0x90) {
+                        const bal = (recRes[0] << 16) | (recRes[1] << 8) | recRes[2];
+                        logApdu(`Data Record Flazz Terbaca (Estimasi Saldo: Rp ${bal.toLocaleString('id-ID')})`);
+                        applyCardFromReader(uidHex, 'BCA FLAZZ (USB)', bal);
+                    } else {
+                        logApdu('UID Flazz berhasil dibaca. Sektor saldo dilindungi enkripsi proprietary BCA.', 'info');
+                        applyCardFromReader(uidHex, 'BCA FLAZZ (USB)', null);
+                    }
+                }
+            } catch (err) {
+                logApdu(err.message, 'err');
+            }
+        }
+
+        // Terapkan hasil baca USB Reader ke dashboard utama
+        function applyCardFromReader(uidHex, providerLabel, parsedBalance) {
+            const cardKey = 'card_' + uidHex;
+            const formattedNum = uidHex.match(/.{1,4}/g)?.join(' ') || uidHex;
+
+            if (!cardsDatabase[cardKey]) {
+                cardsDatabase[cardKey] = {
+                    number: formattedNum,
+                    provider: providerLabel,
+                    theme: providerLabel.includes('FLAZZ')
+                        ? 'from-blue-700 via-blue-800 to-indigo-950'
+                        : 'from-slate-800 via-slate-900 to-blue-950',
+                    balance: parsedBalance !== null ? parsedBalance : 0,
+                    transactions: []
+                };
+            } else if (parsedBalance !== null) {
+                cardsDatabase[cardKey].balance = parsedBalance;
+            }
+
+            currentCardKey = cardKey;
+            document.getElementById('cardNumberInput').value = formattedNum;
+            updateTimestamp();
+            renderDashboard();
+            showToast(`Kartu terbaca dari USB Reader (${uidHex})`);
+        }
+
+        // Salin Nomor Kartu
+        function copyCardNumber() {
+            if (currentCardKey === 'empty') return;
+            const num = cardsDatabase[currentCardKey].number.replace(/\s+/g, '');
+            const tempInput = document.createElement('input');
+            tempInput.value = num;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast('Nomor kartu berhasil disalin!');
+        }
+
+        // Update Waktu Terakhir
+        function updateTimestamp() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('lastUpdatedDisplay').textContent = `Hari ini, ${timeStr} WIB`;
+        }
+
+        // Notifikasi Toast
+        let toastTimeout;
+        function showToast(msg, type = 'success') {
+            const box = document.getElementById('toastBox');
+            const msgEl = document.getElementById('toastMessage');
+            const iconEl = document.getElementById('toastIcon');
+
+            msgEl.textContent = msg;
+            if (type === 'error') {
+                iconEl.setAttribute('data-lucide', 'alert-circle');
+                iconEl.className = 'w-5 h-5 text-rose-400';
+            } else {
+                iconEl.setAttribute('data-lucide', 'check-circle');
+                iconEl.className = 'w-5 h-5 text-emerald-400';
+            }
+            lucide.createIcons();
+
+            box.classList.remove('hidden');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                box.classList.add('hidden');
+            }, 3500);
+        }
+
+        // Inisialisasi awal (kondisi kosong)
+        renderDashboard();
+    </script>
+</body>
+</html>
