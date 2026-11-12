@@ -317,33 +317,50 @@
 
     <!-- Modal Scan NFC -->
     <div id="scanModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl relative">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <button onclick="closeScanModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
-            <div class="my-6 relative flex items-center justify-center">
-                <div class="w-24 h-24 rounded-full bg-blue-100 absolute nfc-pulse"></div>
-                <div class="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center relative z-10 shadow-lg">
-                    <i data-lucide="smartphone-nfc" class="w-10 h-10"></i>
+            <div class="my-5 relative flex items-center justify-center">
+                <div id="nfcPulseRing" class="w-24 h-24 rounded-full bg-blue-100 absolute nfc-pulse"></div>
+                <div id="nfcIconCircle" class="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center relative z-10 shadow-lg transition-all duration-300">
+                    <i id="nfcCenterIcon" data-lucide="smartphone-nfc" class="w-10 h-10"></i>
                 </div>
             </div>
-            <h3 class="text-lg font-bold text-slate-900">Tempelkan Kartu e-Toll</h3>
-            <p id="nfcStatusText" class="text-sm text-slate-500 mt-2 mb-4">
-                Tempelkan kartu e-Money, Flazz, atau BRIZZI di bagian belakang smartphone Android Anda untuk membaca UID chip NFC secara langsung.
+            <h3 id="nfcModalTitle" class="text-lg font-bold text-slate-900">Tempelkan Kartu e-Toll</h3>
+            <p id="nfcStatusText" class="text-xs text-slate-500 mt-1.5 mb-4 leading-relaxed">
+                Tempelkan kartu e-Money, Flazz, atau BRIZZI di bagian belakang smartphone Android Anda untuk mendeteksi chip NFC.
             </p>
             
             <!-- Kotak Hasil Pembacaan Chip NFC Asli -->
-            <div id="nfcRawOutput" class="hidden mb-4 p-3 rounded-xl bg-slate-900 text-left font-mono text-xs text-emerald-400 overflow-x-auto">
-                <p class="text-slate-400 text-[10px] uppercase mb-1">Data Chip Terbaca (Web NFC):</p>
-                <div id="nfcRawDetails"></div>
+            <div id="nfcRawOutput" class="hidden mb-4 p-3.5 rounded-2xl bg-slate-900 text-left font-mono text-xs text-emerald-400 border border-slate-800">
+                <div class="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-2 border-b border-slate-800 pb-1.5">
+                    <span>Data Chip (Web NFC)</span>
+                    <span class="text-emerald-400 flex items-center gap-1">● Terdeteksi</span>
+                </div>
+                <div id="nfcRawDetails" class="space-y-1"></div>
+            </div>
+
+            <!-- Box Penjelasan Teknis & Saldo -->
+            <div id="nfcEduBox" class="hidden mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-left text-xs text-amber-900 leading-relaxed space-y-1.5">
+                <div class="flex items-start gap-1.5 font-semibold text-amber-950">
+                    <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                    <span>Kenapa saldo belum otomatis keluar?</span>
+                </div>
+                <p class="text-[11px] text-amber-800">
+                    Browser (Chrome) dibatasi standar W3C hanya untuk membaca ID fisik kartu (UID). Sektor saldo & mutasi bank (e-Money / Flazz) diproteksi enkripsi <strong>ISO-DEP APDU</strong> yang hanya bisa diakses via aplikasi perbankan (Livin / BCA Mobile).
+                </p>
+                <p class="text-[11px] text-amber-900 font-medium">
+                    Silakan simpan saldo fisik aktual kartu Anda ke penyimpanan HP ini agar otomatis tersimpan permanen!
+                </p>
             </div>
 
             <div class="space-y-2.5">
-                <button id="startNfcBtn" onclick="startRealNfcScan()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+                <button id="nfcActionBtn" onclick="startRealNfcScan()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-2 text-xs">
                     <i data-lucide="wifi" class="w-4 h-4 rotate-90"></i>
-                    <span>Aktifkan Sensor NFC Asli</span>
+                    <span id="nfcActionBtnText">Aktifkan Sensor NFC HP</span>
                 </button>
-                <button onclick="closeScanModal(); openSyncModal();" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-2.5 rounded-xl transition">
+                <button id="nfcSyncBtn" onclick="closeScanModal(); openSyncModal();" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-2.5 rounded-xl transition">
                     Input Saldo & Mutasi Secara Manual
                 </button>
             </div>
@@ -362,82 +379,198 @@
                     <i data-lucide="usb" class="w-6 h-6"></i>
                 </div>
                 <div>
-                    <h3 class="text-lg font-bold text-slate-900">USB Smart Card Reader (ACR122U)</h3>
-                    <p class="text-xs text-slate-500">Komunikasi langsung ISO 7816-4 APDU melalui protokol WebUSB CCID</p>
+                    <h3 class="text-lg font-bold text-slate-900">Pembaca Kartu USB (NFC / RFID)</h3>
+                    <p class="text-xs text-slate-500">Pilih mode koneksi sesuai jenis alat reader USB Anda</p>
                 </div>
             </div>
 
-            <!-- Status Koneksi Perangkat -->
-            <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <div class="flex items-center gap-2.5">
-                    <span id="usbStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-                    <div>
-                        <p id="usbDeviceName" class="text-xs font-bold text-slate-800">Belum ada reader terhubung</p>
-                        <p id="usbDeviceSub" class="text-[11px] text-slate-500">Colokkan ACR122U / reader CCID ke port USB</p>
+            <!-- Tab Navigasi Mode USB -->
+            <div class="flex bg-slate-100 p-1 rounded-2xl mb-4 text-xs font-medium">
+                <button onclick="switchUsbTab('webusb')" id="tabBtn-webusb" class="flex-1 py-2 px-2 rounded-xl bg-white text-slate-900 font-semibold shadow-sm transition">
+                    WebUSB (ACR122U)
+                </button>
+                <button onclick="switchUsbTab('keyboard')" id="tabBtn-keyboard" class="flex-1 py-2 px-2 rounded-xl text-slate-600 hover:text-slate-900 transition">
+                    Auto-Scan Keyboard
+                </button>
+                <button onclick="switchUsbTab('serial')" id="tabBtn-serial" class="flex-1 py-2 px-2 rounded-xl text-slate-600 hover:text-slate-900 transition">
+                    Serial COM
+                </button>
+                <button onclick="switchUsbTab('bridge')" id="tabBtn-bridge" class="flex-1 py-2 px-2 rounded-xl text-slate-600 hover:text-slate-900 transition">
+                    Local Bridge
+                </button>
+            </div>
+
+            <!-- KONTEN TAB 1: WEBUSB (ACR122U / CCID) -->
+            <div id="tabContent-webusb" class="space-y-3.5">
+                <!-- Status Koneksi Perangkat -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <span id="usbStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                        <div>
+                            <p id="usbDeviceName" class="text-xs font-bold text-slate-800">Belum ada reader terhubung</p>
+                            <p id="usbDeviceSub" class="text-[11px] text-slate-500">Colokkan ACR122U / reader CCID ke port USB PC</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="connectUsbBtn" onclick="connectUsbReader(false)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition shadow-sm">
+                            Hubungkan Reader
+                        </button>
+                        <button id="connectUsbAllBtn" onclick="connectUsbReader(true)" title="Coba jika perangkat tidak muncul di daftar" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium px-2.5 py-2 rounded-xl transition">
+                            Semua USB
+                        </button>
+                        <button id="disconnectUsbBtn" onclick="disconnectUsbReader()" class="hidden bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold px-3 py-2 rounded-xl transition">
+                            Putus
+                        </button>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button id="connectUsbBtn" onclick="connectUsbReader()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-sm">
-                        Hubungkan Reader
-                    </button>
-                    <button id="disconnectUsbBtn" onclick="disconnectUsbReader()" class="hidden bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold px-3 py-2 rounded-xl transition">
-                        Putus
-                    </button>
-                </div>
-            </div>
 
-            <!-- Preset Perintah APDU e-Toll -->
-            <div class="space-y-3 mb-4">
-                <div class="flex items-center justify-between">
-                    <label class="text-xs font-semibold text-slate-700">Perintah Cepat (Preset APDU)</label>
-                    <span class="text-[11px] text-slate-400">Hexadecimal (ISO 7816-4)</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="runPresetApdu('get_uid')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
-                        <p class="text-xs font-semibold text-slate-800">1. Baca UID & ATR Kartu</p>
-                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">FF CA 00 00 00</p>
-                    </button>
-                    <button type="button" onclick="runPresetApdu('read_emoney')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
-                        <p class="text-xs font-semibold text-slate-800">2. Baca Saldo & Log e-Money</p>
-                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">SELECT AID + GET BALANCE</p>
-                    </button>
-                    <button type="button" onclick="runPresetApdu('read_flazz')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
-                        <p class="text-xs font-semibold text-slate-800">3. Baca Info BCA Flazz</p>
-                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">00 A4 04 00 + READ REC</p>
-                    </button>
-                    <button type="button" onclick="runPresetApdu('power_on')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
-                        <p class="text-xs font-semibold text-slate-800">0. Aktivasi Daya ICC (Reset)</p>
-                        <p class="text-[10px] font-mono text-slate-500 mt-0.5">PC_to_RDR_IccPowerOn</p>
-                    </button>
+                <!-- Alert Diagnostik Driver Windows (Zadig) -->
+                <div id="windowsDriverAlert" class="hidden p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 font-bold text-amber-900">
+                            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+                            <span>Windows Memblokir Akses USB CCID Bawaan</span>
+                        </div>
+                        <button onclick="document.getElementById('windowsDriverAlert').classList.add('hidden')" class="text-amber-600 hover:text-amber-800 text-[11px]">Tutup</button>
+                    </div>
+                    <p class="text-[11px] text-amber-800 leading-relaxed">
+                        Di Windows, driver <em>Microsoft Usbccid</em> mengunci reader ACR122U secara eksklusif sehingga Chrome ditolak (Access Denied).
+                    </p>
+                    <div class="bg-white/80 p-2.5 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 space-y-1">
+                        <p class="font-semibold text-slate-800">Solusi Driver WinUSB (Cukup 1x set):</p>
+                        <ol class="list-decimal list-inside space-y-0.5 text-slate-700">
+                            <li>Unduh tool gratis <a href="https://zadig.akeo.ie/" target="_blank" class="underline font-semibold text-blue-600">Zadig (zadig.akeo.ie)</a></li>
+                            <li>Buka Zadig > klik menu <strong>Options</strong> > centang <strong>List All Devices</strong></li>
+                            <li>Pilih <strong>ACR122U PICC Interface</strong> di dropdown</li>
+                            <li>Pastikan driver tujuan adalah <strong>WinUSB</strong>, lalu klik tombol <strong>Replace Driver</strong></li>
+                            <li>Kembali ke sini dan klik <strong>Hubungkan Reader</strong>.</li>
+                        </ol>
+                    </div>
+                    <p class="text-[10px] text-slate-500">
+                        *Atau jika tidak ingin mengganti driver, gunakan tab <strong>Auto-Scan Keyboard</strong> atau <strong>Local Bridge</strong> di atas.
+                    </p>
                 </div>
 
-                <!-- Input Custom APDU -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Kirim Perintah APDU Manual (Hex)</label>
+                <!-- Preset Perintah APDU e-Toll -->
+                <div class="space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-semibold text-slate-700">Perintah APDU e-Toll (ISO 7816-4)</label>
+                        <span class="text-[11px] text-slate-400">Hexadecimal</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" onclick="runPresetApdu('get_uid')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                            <p class="text-xs font-semibold text-slate-800">1. Baca UID & ATR Kartu</p>
+                            <p class="text-[10px] font-mono text-slate-500 mt-0.5">FF CA 00 00 00</p>
+                        </button>
+                        <button type="button" onclick="runPresetApdu('read_emoney')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                            <p class="text-xs font-semibold text-slate-800">2. Baca Saldo & Log e-Money</p>
+                            <p class="text-[10px] font-mono text-slate-500 mt-0.5">SELECT AID + GET BALANCE</p>
+                        </button>
+                        <button type="button" onclick="runPresetApdu('read_flazz')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                            <p class="text-xs font-semibold text-slate-800">3. Baca Info BCA Flazz</p>
+                            <p class="text-[10px] font-mono text-slate-500 mt-0.5">00 A4 04 00 + READ REC</p>
+                        </button>
+                        <button type="button" onclick="runPresetApdu('power_on')" class="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition">
+                            <p class="text-xs font-semibold text-slate-800">0. Reset Daya ICC (Power On)</p>
+                            <p class="text-[10px] font-mono text-slate-500 mt-0.5">PC_to_RDR_IccPowerOn</p>
+                        </button>
+                    </div>
+
+                    <!-- Input Custom APDU -->
                     <div class="flex gap-2">
-                        <input type="text" id="customApduInput" value="FF CA 00 00 00" placeholder="Contoh: FF CA 00 00 00" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="customApduInput" value="FF CA 00 00 00" placeholder="Perintah Hex (contoh: FF CA 00 00 00)" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         <button type="button" onclick="sendCustomApduCommand()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition">
                             Kirim APDU
                         </button>
                     </div>
                 </div>
+
+                <!-- Konsol Log APDU TX / RX -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-semibold text-slate-700">Log Komunikasi APDU (TX / RX)</span>
+                        <button type="button" onclick="clearApduConsole()" class="text-[11px] text-slate-400 hover:text-slate-600">Bersihkan Log</button>
+                    </div>
+                    <div id="apduConsoleLog" class="bg-slate-950 text-slate-200 font-mono text-[11px] p-3 rounded-2xl h-36 overflow-y-auto space-y-1 leading-relaxed">
+                        <div class="text-slate-500">// Hubungkan reader ACR122U lalu tempelkan kartu...</div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Konsol Log APDU TX / RX -->
-            <div>
-                <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-xs font-semibold text-slate-700">Log Komunikasi APDU (TX / RX)</span>
-                    <button type="button" onclick="clearApduConsole()" class="text-[11px] text-slate-400 hover:text-slate-600">Bersihkan Log</button>
+            <!-- KONTEN TAB 2: MODE KEYBOARD AUTO-SCAN (PLUG & PLAY) -->
+            <div id="tabContent-keyboard" class="hidden space-y-4">
+                <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-3">
+                    <div class="flex items-center gap-2.5 text-emerald-800 font-bold text-sm">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span>Mode Auto-Scan Keyboard Aktif</span>
+                    </div>
+                    <p class="text-xs text-emerald-900 leading-relaxed">
+                        Sebagian besar alat pembaca USB RFID / NFC (seperti IC Card Reader 13.56MHz seharga Rp 40.000 - Rp 150.000) bekerja otomatis sebagai <strong>Keyboard Simulator</strong>.
+                    </p>
+                    <div class="bg-white p-3 rounded-xl border border-emerald-100 text-xs text-slate-700 space-y-1">
+                        <p class="font-semibold text-emerald-950">Cara Menggunakan:</p>
+                        <p>1. Cukup colokkan reader USB ke PC (lampu alat menyala).</p>
+                        <p>2. Tempelkan kartu e-Toll Anda di atas reader USB.</p>
+                        <p>3. Alat akan otomatis membunyikan beep dan nomor kartu langsung terisi di aplikasi ini tanpa perlu instal driver!</p>
+                    </div>
                 </div>
-                <div id="apduConsoleLog" class="bg-slate-950 text-slate-200 font-mono text-[11px] p-3.5 rounded-2xl h-44 overflow-y-auto space-y-1.5 leading-relaxed">
-                    <div class="text-slate-500">// Siap. Hubungkan reader ACR122U lalu tempelkan kartu di atas reader...</div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Uji Tempel Kartu (Scanner Box)</label>
+                    <input type="text" id="scannerTestInput" placeholder="Tempelkan kartu di reader USB untuk tes..." class="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" readonly>
+                    <p class="text-[11px] text-slate-400 mt-1.5">
+                        *Sistem mendengarkan ketikan scanner otomatis di seluruh halaman secara global.
+                    </p>
                 </div>
             </div>
 
-            <!-- Catatan Driver Windows -->
-            <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">
-                <strong>Catatan OS:</strong> Di Linux/macOS/Android WebUSB langsung berjalan. Di Windows, pastikan driver USB menggunakan <strong>WinUSB</strong> (via Zadig) jika Chrome memblokir antarmuka CCID bawaan sistem.
-            </p>
+            <!-- KONTEN TAB 3: WEB SERIAL (COM PORT) -->
+            <div id="tabContent-serial" class="hidden space-y-3.5">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <span id="serialStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                        <div>
+                            <p id="serialStatusText" class="text-xs font-bold text-slate-800">Port Serial Terputus</p>
+                            <p class="text-[11px] text-slate-500">Untuk modul PN532 USB / Arduino / ESP32</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="connectSerialBtn" onclick="connectSerialReader()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-sm">
+                            Pilih Port COM
+                        </button>
+                        <button id="disconnectSerialBtn" onclick="disconnectSerialReader()" class="hidden bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold px-3.5 py-2 rounded-xl transition">
+                            Putus Port
+                        </button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Jika pembaca NFC Anda menggunakan antarmuka USB Serial (CH340 / CP2102 / FTDI), klik "Pilih Port COM" untuk mengizinkan Chrome membaca data serial pada baudrate 9600 / 115200 bps.
+                </p>
+            </div>
+
+            <!-- KONTEN TAB 4: LOCAL BRIDGE SERVER (PC/SC TANPA ZADIG) -->
+            <div id="tabContent-bridge" class="hidden space-y-3.5">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <span id="bridgeStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                        <div>
+                            <p id="bridgeStatusText" class="text-xs font-bold text-slate-800">Bridge Lokal Belum Terhubung</p>
+                            <p class="text-[11px] text-slate-500">http://localhost:8080/events</p>
+                        </div>
+                    </div>
+                    <button onclick="connectLocalBridge()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-sm">
+                        Sambungkan Bridge
+                    </button>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-2">
+                    <p class="text-emerald-400 font-bold">// Keunggulan Mode Local Bridge:</p>
+                    <p class="text-slate-300">Menggunakan driver resmi bawaan Windows (PC/SC) tanpa perlu mengubah driver ke WinUSB lewat Zadig.</p>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-200">
+                        <p class="text-slate-400"># Jalankan perintah ini di Command Prompt / PowerShell folder proyek:</p>
+                        <p class="text-sky-400 mt-1 font-semibold">node bridge.js</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -445,16 +578,91 @@
         // Inisialisasi ikon Lucide
         lucide.createIcons();
 
-        // Data Kartu (Hanya menyimpan kartu kosong default dan kartu riil milik pengguna)
-        const cardsDatabase = {
-            'empty': {
-                number: '',
-                provider: 'BELUM ADA KARTU',
-                theme: 'from-slate-700 via-slate-800 to-slate-900',
-                balance: 0,
-                transactions: []
+        // Penyimpanan Lokal Persisten (localStorage)
+        const STORAGE_KEY = 'etoll_cards_db_v2';
+        const LAST_CARD_KEY = 'etoll_last_active_card';
+
+        function loadCardsFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && typeof parsed === 'object') {
+                        if (!parsed['empty']) {
+                            parsed['empty'] = {
+                                number: '',
+                                provider: 'BELUM ADA KARTU',
+                                theme: 'from-slate-700 via-slate-800 to-slate-900',
+                                balance: 0,
+                                transactions: []
+                            };
+                        }
+                        return parsed;
+                    }
+                }
+            } catch (e) {
+                console.warn('Gagal membaca localStorage:', e);
             }
-        };
+            return {
+                'empty': {
+                    number: '',
+                    provider: 'BELUM ADA KARTU',
+                    theme: 'from-slate-700 via-slate-800 to-slate-900',
+                    balance: 0,
+                    transactions: []
+                }
+            };
+        }
+
+        const cardsDatabase = loadCardsFromStorage();
+
+        function saveCardsToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cardsDatabase));
+                localStorage.setItem(LAST_CARD_KEY, currentCardKey);
+            } catch (e) {
+                console.warn('Gagal menyimpan ke localStorage:', e);
+            }
+        }
+
+        // Suara Beep Feedback Real-time (Web Audio API)
+        function playBeepSound(type = 'success') {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const audioCtx = new AudioCtx();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'double') {
+                    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+                    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+
+                    setTimeout(() => {
+                        const osc2 = audioCtx.createOscillator();
+                        const gain2 = audioCtx.createGain();
+                        osc2.connect(gain2);
+                        gain2.connect(audioCtx.destination);
+                        osc2.frequency.setValueAtTime(1174.66, audioCtx.currentTime); // D6
+                        gain2.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+                        osc2.start();
+                        osc2.stop(audioCtx.currentTime + 0.12);
+                    }, 120);
+                } else {
+                    osc.frequency.setValueAtTime(987.77, audioCtx.currentTime); // B5
+                    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                }
+            } catch (e) {}
+        }
 
         // Deteksi penyedia kartu dari awalan/panjang nomor kartu
         function detectCardMeta(cleanNumber) {
@@ -710,11 +918,28 @@
             document.getElementById('syncModal').classList.remove('hidden');
         }
 
+        // Buka modal sinkronisasi khusus saat chip baru di-tap via NFC/USB
+        function openSyncModalWithCard(cleanNumber, defaultBalance = '') {
+            closeScanModal();
+            closeUsbReaderModal();
+            const formatted = cleanNumber.match(/.{1,4}/g)?.join(' ') || cleanNumber;
+            document.getElementById('syncCardNumber').value = formatted;
+            document.getElementById('syncCurrentBalance').value = defaultBalance;
+            document.getElementById('syncTrxAmount').value = '';
+            document.getElementById('syncTrxTitle').value = '';
+            document.getElementById('syncTrxDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('syncModal').classList.remove('hidden');
+            setTimeout(() => {
+                const balInput = document.getElementById('syncCurrentBalance');
+                if (balInput) balInput.focus();
+            }, 180);
+        }
+
         function closeSyncModal() {
             document.getElementById('syncModal').classList.add('hidden');
         }
 
-        // Simpan Data Asli Kartu & Mutasi
+        // Simpan Data Asli Kartu & Mutasi ke Penyimpanan Permanen
         function handleSaveRealData(e) {
             e.preventDefault();
             const rawNum = document.getElementById('syncCardNumber').value.replace(/\s+/g, '');
@@ -760,11 +985,12 @@
             }
 
             currentCardKey = cardKey;
+            saveCardsToStorage();
             document.getElementById('cardNumberInput').value = formattedNum;
             updateTimestamp();
             renderDashboard();
             closeSyncModal();
-            showToast('Data kartu & mutasi berhasil diperbarui!');
+            showToast('Data kartu & saldo berhasil disimpan!');
         }
 
         // Cek Kartu dari Form Input
@@ -789,6 +1015,7 @@
             }
 
             currentCardKey = cardKey;
+            saveCardsToStorage();
             updateTimestamp();
             renderDashboard();
             showToast('Kartu dibuka. Klik "Input / Sinkron Data Kartu" untuk menyesuaikan saldo & mutasi fisik.');
@@ -800,8 +1027,14 @@
         function openScanModal() {
             document.getElementById('scanModal').classList.remove('hidden');
             document.getElementById('nfcRawOutput').classList.add('hidden');
+            document.getElementById('nfcEduBox').classList.add('hidden');
+            document.getElementById('nfcModalTitle').textContent = 'Tempelkan Kartu e-Toll';
             document.getElementById('nfcStatusText').textContent = 
-                'Tempelkan kartu e-Money, Flazz, atau BRIZZI di bagian belakang smartphone Android Anda untuk membaca chip NFC secara langsung.';
+                'Tempelkan kartu e-Money, Flazz, atau BRIZZI di bagian belakang smartphone Android Anda untuk mendeteksi chip NFC.';
+            document.getElementById('nfcActionBtnText').textContent = 'Aktifkan Sensor NFC HP';
+            document.getElementById('nfcActionBtn').onclick = startRealNfcScan;
+            document.getElementById('nfcIconCircle').className = 'w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center relative z-10 shadow-lg';
+            document.getElementById('nfcPulseRing').className = 'w-24 h-24 rounded-full bg-blue-100 absolute nfc-pulse';
         }
 
         function closeScanModal() {
@@ -817,9 +1050,12 @@
             const statusText = document.getElementById('nfcStatusText');
             const rawOutput = document.getElementById('nfcRawOutput');
             const rawDetails = document.getElementById('nfcRawDetails');
+            const eduBox = document.getElementById('nfcEduBox');
+            const actionBtn = document.getElementById('nfcActionBtn');
+            const actionBtnText = document.getElementById('nfcActionBtnText');
 
             if (!('NDEFReader' in window)) {
-                statusText.textContent = 'Browser/perangkat ini tidak mendukung Web NFC (hanya tersedia di Google Chrome Android). Gunakan tombol simulasi di bawah.';
+                statusText.textContent = 'Browser ini tidak mendukung Web NFC (hanya tersedia di Google Chrome Android). Gunakan tombol Input Manual.';
                 showToast('Web NFC hanya didukung di Google Chrome Android.', 'error');
                 return;
             }
@@ -837,27 +1073,36 @@
                 await ndef.scan({ signal: nfcAbortController.signal });
 
                 ndef.addEventListener('readingerror', () => {
-                    statusText.textContent = 'Gagal membaca chip kartu. Pastikan kartu menempel stabil dan coba lagi.';
+                    statusText.textContent = 'Gagal membaca chip kartu. Pastikan kartu menempel stabil di dekat sensor HP.';
                     showToast('Gagal membaca kartu, coba tempelkan ulang.', 'error');
                 });
 
                 ndef.addEventListener('reading', ({ message, serialNumber }) => {
+                    playBeepSound('double');
                     rawOutput.classList.remove('hidden');
-                    const recordCount = message && message.records ? message.records.length : 0;
-                    rawDetails.innerHTML = `
-                        <div>UID / Serial : ${serialNumber || 'Tidak terbaca'}</div>
-                        <div>NDEF Records : ${recordCount} record(s)</div>
-                        <div>Status Chip  : Terdeteksi (IsoDep/Felica)</div>
-                    `;
 
-                    // Buat profil kartu hasil pembacaan chip NFC asli tanpa angka fiktif
+                    const recordCount = message && message.records ? message.records.length : 0;
                     const cleanUid = (serialNumber || 'NFC' + Date.now()).replace(/:/g, '').toUpperCase();
                     const cardKey = 'card_' + cleanUid;
 
+                    document.getElementById('nfcModalTitle').textContent = 'Kartu Fisik Berhasil Terbaca!';
+                    document.getElementById('nfcIconCircle').className = 'w-20 h-20 rounded-full bg-emerald-600 text-white flex items-center justify-center relative z-10 shadow-lg';
+                    document.getElementById('nfcPulseRing').className = 'w-24 h-24 rounded-full bg-emerald-100 absolute nfc-pulse';
+
+                    const isRegistered = cardsDatabase[cardKey] && cardsDatabase[cardKey].balance > 0;
+
+                    rawDetails.innerHTML = `
+                        <div class="flex justify-between"><span>UID / Serial</span> <strong class="text-white">${serialNumber || cleanUid}</strong></div>
+                        <div class="flex justify-between"><span>NDEF Records</span> <span>${recordCount} record(s)</span></div>
+                        <div class="flex justify-between"><span>Tipe Chip</span> <span>IsoDep / Contactless Smartcard</span></div>
+                        ${isRegistered ? `<div class="flex justify-between text-emerald-300 pt-1.5 border-t border-slate-800"><span>Saldo Tersimpan</span> <strong>${formatRupiah(cardsDatabase[cardKey].balance)}</strong></div>` : ''}
+                    `;
+
                     if (!cardsDatabase[cardKey]) {
+                        const meta = detectCardMeta(cleanUid);
                         cardsDatabase[cardKey] = {
                             number: cleanUid.match(/.{1,4}/g)?.join(' ') || cleanUid,
-                            provider: 'CHIP NFC TERDETEKSI',
+                            provider: meta.provider !== 'KARTU E-TOLL / NFC' ? meta.provider : 'CHIP NFC TERDETEKSI',
                             theme: 'from-emerald-700 via-teal-800 to-slate-900',
                             balance: 0,
                             transactions: []
@@ -865,23 +1110,60 @@
                     }
 
                     currentCardKey = cardKey;
+                    saveCardsToStorage();
                     document.getElementById('cardNumberInput').value = cardsDatabase[cardKey].number;
                     updateTimestamp();
                     renderDashboard();
-                    showToast(`Chip kartu terdeteksi (UID: ${serialNumber}). Silakan lengkapi saldo aktual.`);
+
+                    if (isRegistered) {
+                        statusText.textContent = `Kartu (${cleanUid}) ditemukan di HP ini dengan saldo ${formatRupiah(cardsDatabase[cardKey].balance)}.`;
+                        eduBox.classList.add('hidden');
+                        actionBtnText.textContent = 'Buka Kartu di Dasbor';
+                        actionBtn.onclick = () => {
+                            closeScanModal();
+                            showToast(`Kartu ${cleanUid} dibuka.`);
+                        };
+                    } else {
+                        statusText.textContent = `Chip kartu fisik terdeteksi (UID: ${serialNumber || cleanUid}). Sesuai batasan keamanan browser, silakan isi saldo fisik kartu Anda.`;
+                        eduBox.classList.remove('hidden');
+                        actionBtnText.textContent = 'Input & Simpan Saldo Kartu Ini';
+                        actionBtn.onclick = () => {
+                            openSyncModalWithCard(cleanUid);
+                        };
+                    }
+
+                    showToast(`Chip kartu fisik terdeteksi (${serialNumber || cleanUid})!`);
                 });
 
             } catch (error) {
                 if (error.name !== 'AbortError') {
                     document.getElementById('nfcStatusText').textContent = 
-                        'Pastikan fitur NFC di pengaturan HP Android Anda sudah dinyalakan, lalu coba lagi.';
+                        'Pastikan fitur NFC di pengaturan HP Android Anda sudah aktif dan izin NFC diizinkan di Chrome.';
                     showToast('Izin NFC ditolak atau sensor NFC belum aktif.', 'error');
                 }
             }
         }
 
         // =========================================================================
-        // MODUL WEBUSB SMART CARD READER (ACR122U / CCID ISO 7816-4 APDU)
+        // PENGELOLA MODE PEMBACA KARTU USB (ACR122U, KEYBOARD SCANNER, SERIAL, BRIDGE)
+        // =========================================================================
+        function switchUsbTab(tabName) {
+            const tabs = ['webusb', 'keyboard', 'serial', 'bridge'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tabBtn-${t}`);
+                const content = document.getElementById(`tabContent-${t}`);
+                if (t === tabName) {
+                    btn.className = 'flex-1 py-2 px-2 rounded-xl bg-white text-slate-900 font-semibold shadow-sm transition';
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = 'flex-1 py-2 px-2 rounded-xl text-slate-600 hover:text-slate-900 transition';
+                    content.classList.add('hidden');
+                }
+            });
+        }
+
+        // =========================================================================
+        // TAB 1: WEBUSB SMART CARD READER (ACR122U / CCID ISO 7816-4 APDU)
         // =========================================================================
         let usbDevice = null;
         let ccidInterfaceNumber = null;
@@ -899,6 +1181,7 @@
 
         function logApdu(message, type = 'info') {
             const consoleEl = document.getElementById('apduConsoleLog');
+            if (!consoleEl) return;
             const line = document.createElement('div');
             const time = new Date().toTimeString().slice(0, 8);
             if (type === 'tx') {
@@ -919,7 +1202,8 @@
         }
 
         function clearApduConsole() {
-            document.getElementById('apduConsoleLog').innerHTML = '<div class="text-slate-500">// Log dibersihkan.</div>';
+            const el = document.getElementById('apduConsoleLog');
+            if (el) el.innerHTML = '<div class="text-slate-500">// Log dibersihkan.</div>';
         }
 
         function hexToBytes(hex) {
@@ -939,21 +1223,40 @@
         }
 
         // Hubungkan ke ACR122U atau Smart Card Reader CCID via WebUSB
-        async function connectUsbReader() {
+        async function connectUsbReader(allowAll = false) {
             if (!('usb' in navigator)) {
                 logApdu('Browser ini tidak mendukung WebUSB. Gunakan Google Chrome atau Microsoft Edge di PC.', 'err');
                 showToast('WebUSB hanya didukung di Chrome / Edge Desktop.', 'error');
                 return;
             }
 
+            if (!window.isSecureContext) {
+                logApdu('WebUSB memerlukan Secure Context (HTTPS atau http://localhost).', 'err');
+                showToast('WebUSB memerlukan HTTPS atau http://localhost.', 'error');
+                return;
+            }
+
             try {
-                // Filter ACR122U (Vendor ID 0x072F) atau semua perangkat Smart Card Class (0x0B)
-                usbDevice = await navigator.usb.requestDevice({
-                    filters: [
-                        { vendorId: 0x072f }, // Advanced Card Systems (ACS ACR122U / ACR1252U)
-                        { classCode: 0x0b }   // USB Smart Card Device Class (CCID)
-                    ]
-                });
+                let options = {};
+                if (!allowAll) {
+                    options = {
+                        filters: [
+                            { vendorId: 0x072f }, // Advanced Card Systems (ACS ACR122U / ACR1252U)
+                            { classCode: 0x0b },  // USB Smart Card Device Class (CCID)
+                            { vendorId: 0x04e6 }, // SCM Microsystems
+                            { vendorId: 0x058f }, // Alcor Micro
+                            { vendorId: 0x2ce3 }, // ACR Clone
+                            { vendorId: 0x1a86 }, // CH340 USB
+                            { vendorId: 0x0403 }, // FTDI
+                            { vendorId: 0x10c4 }  // CP210x
+                        ]
+                    };
+                } else {
+                    options = { filters: [] };
+                }
+
+                logApdu(`Membuka dialog pemilihan perangkat USB ${allowAll ? '(Semua Perangkat)' : '(Filter ACR122U / CCID)'}...`);
+                usbDevice = await navigator.usb.requestDevice(options);
 
                 await usbDevice.open();
                 if (usbDevice.configuration === null) {
@@ -981,11 +1284,15 @@
                 ccidEndpointOut = epOut.endpointNumber;
                 ccidSeq = 0;
 
+                // Sembunyikan alert driver jika berhasil
+                document.getElementById('windowsDriverAlert').classList.add('hidden');
+
                 // Update UI Status
                 document.getElementById('usbStatusDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
                 document.getElementById('usbDeviceName').textContent = usbDevice.productName || 'USB Smart Card Reader';
                 document.getElementById('usbDeviceSub').textContent = `VID: 0x${usbDevice.vendorId.toString(16).toUpperCase()} • Terhubung (CCID)`;
                 document.getElementById('connectUsbBtn').classList.add('hidden');
+                document.getElementById('connectUsbAllBtn').classList.add('hidden');
                 document.getElementById('disconnectUsbBtn').classList.remove('hidden');
 
                 logApdu(`Terhubung ke ${usbDevice.productName || 'USB Reader'} (Interface #${ccidInterfaceNumber})`);
@@ -995,9 +1302,15 @@
                 await sendCcidIccPowerOn();
 
             } catch (err) {
-                if (err.name !== 'NotFoundError') {
+                if (err.name === 'SecurityError' || (err.message && err.message.toLowerCase().includes('access denied'))) {
+                    logApdu(`Error Akses USB: ${err.message}. Windows memblokir driver CCID.`, 'err');
+                    document.getElementById('windowsDriverAlert').classList.remove('hidden');
+                    showToast('Windows memblokir driver CCID bawaan. Silakan pasang WinUSB via Zadig.', 'error');
+                } else if (err.name !== 'NotFoundError') {
                     logApdu(err.message || 'Gagal membuka perangkat USB.', 'err');
-                    showToast('Gagal menghubungkan USB Reader. Cek izin/driver WinUSB.', 'error');
+                    showToast('Gagal menghubungkan USB Reader: ' + (err.message || 'Error tidak diketahui'), 'error');
+                } else {
+                    logApdu('Pemilihan perangkat dibatalkan oleh pengguna.', 'info');
                 }
             }
         }
@@ -1013,6 +1326,7 @@
             document.getElementById('usbDeviceName').textContent = 'Belum ada reader terhubung';
             document.getElementById('usbDeviceSub').textContent = 'Colokkan ACR122U / reader CCID ke port USB';
             document.getElementById('connectUsbBtn').classList.remove('hidden');
+            document.getElementById('connectUsbAllBtn').classList.remove('hidden');
             document.getElementById('disconnectUsbBtn').classList.add('hidden');
             logApdu('Koneksi USB Reader diputus.');
         }
@@ -1172,18 +1486,202 @@
             }
         }
 
-        // Terapkan hasil baca USB Reader ke dashboard utama
-        function applyCardFromReader(uidHex, providerLabel, parsedBalance) {
-            const cardKey = 'card_' + uidHex;
-            const formattedNum = uidHex.match(/.{1,4}/g)?.join(' ') || uidHex;
+        // =========================================================================
+        // TAB 2: GLOBAL LISTENER UNTUK USB NFC READER TIPE KEYBOARD EMULATION (HID)
+        // =========================================================================
+        let keyboardScanBuffer = '';
+        let lastKeyScanTime = 0;
+
+        window.addEventListener('keydown', (e) => {
+            const activeEl = document.activeElement;
+            const isEditingText = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.id !== 'scannerTestInput' && activeEl.id !== 'cardNumberInput';
+
+            const now = Date.now();
+            const timeDiff = now - lastKeyScanTime;
+            lastKeyScanTime = now;
+
+            // Karakter enter menandakan scanner selesai mengirim nomor
+            if (e.key === 'Enter') {
+                if (keyboardScanBuffer.length >= 8) {
+                    e.preventDefault();
+                    const scannedNumber = keyboardScanBuffer.trim();
+                    keyboardScanBuffer = '';
+                    handleAutoScannedCard(scannedNumber, 'USB SCANNER (PLUG & PLAY)');
+                    return;
+                }
+                keyboardScanBuffer = '';
+                return;
+            }
+
+            // Kumpulkan ketikan cepat khas alat pembaca kartu USB
+            if (e.key.length === 1 && /[0-9a-zA-Z]/.test(e.key)) {
+                if (timeDiff > 80 && !isEditingText) {
+                    keyboardScanBuffer = e.key;
+                } else {
+                    keyboardScanBuffer += e.key;
+                }
+            }
+        });
+
+        function handleAutoScannedCard(rawScanned, sourceLabel) {
+            playBeepSound('double');
+            const cleanNum = rawScanned.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+            const cardKey = 'card_' + cleanNum;
+            const formatted = cleanNum.match(/.{1,4}/g)?.join(' ') || cleanNum;
 
             if (!cardsDatabase[cardKey]) {
+                const meta = detectCardMeta(cleanNum);
+                cardsDatabase[cardKey] = {
+                    number: formatted,
+                    provider: meta.provider !== 'KARTU E-TOLL / NFC' ? meta.provider : sourceLabel,
+                    theme: meta.theme,
+                    balance: 0,
+                    transactions: []
+                };
+            }
+
+            currentCardKey = cardKey;
+            saveCardsToStorage();
+            document.getElementById('cardNumberInput').value = formatted;
+            updateTimestamp();
+            renderDashboard();
+
+            const testInput = document.getElementById('scannerTestInput');
+            if (testInput) {
+                testInput.value = `Terbaca: ${formatted} (${sourceLabel})`;
+            }
+
+            showToast(`Kartu terdeteksi via ${sourceLabel} (${formatted})!`);
+        }
+
+        // =========================================================================
+        // TAB 3: WEB SERIAL API (UNTUK MODUL SERIAL/UART NFC)
+        // =========================================================================
+        let serialPort = null;
+        let serialReader = null;
+        let serialKeepReading = false;
+
+        async function connectSerialReader() {
+            if (!('serial' in navigator)) {
+                showToast('Web Serial tidak didukung di browser ini. Gunakan Google Chrome Desktop.', 'error');
+                return;
+            }
+            try {
+                serialPort = await navigator.serial.requestPort();
+                await serialPort.open({ baudRate: 9600 });
+                serialKeepReading = true;
+                document.getElementById('serialStatusDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
+                document.getElementById('serialStatusText').textContent = 'Port Serial Terhubung (9600 bps)';
+                document.getElementById('connectSerialBtn').classList.add('hidden');
+                document.getElementById('disconnectSerialBtn').classList.remove('hidden');
+                showToast('Port Serial berhasil terhubung.');
+                readSerialLoop();
+            } catch (err) {
+                if (err.name !== 'NotFoundError') {
+                    showToast(err.message || 'Gagal membuka port serial.', 'error');
+                }
+            }
+        }
+
+        async function disconnectSerialReader() {
+            serialKeepReading = false;
+            if (serialReader) {
+                try { await serialReader.cancel(); } catch (e) {}
+            }
+            if (serialPort) {
+                try { await serialPort.close(); } catch (e) {}
+                serialPort = null;
+            }
+            document.getElementById('serialStatusDot').className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+            document.getElementById('serialStatusText').textContent = 'Port Serial Terputus';
+            document.getElementById('connectSerialBtn').classList.remove('hidden');
+            document.getElementById('disconnectSerialBtn').classList.add('hidden');
+            showToast('Port Serial diputus.');
+        }
+
+        async function readSerialLoop() {
+            while (serialPort && serialPort.readable && serialKeepReading) {
+                try {
+                    const textDecoder = new TextDecoderStream();
+                    serialPort.readable.pipeTo(textDecoder.writable);
+                    serialReader = textDecoder.readable.getReader();
+                    let accumulated = '';
+                    while (true) {
+                        const { value, done } = await serialReader.read();
+                        if (done) break;
+                        if (value) {
+                            accumulated += value;
+                            if (accumulated.includes('\n') || accumulated.includes('\r')) {
+                                const line = accumulated.trim();
+                                accumulated = '';
+                                if (line.length >= 4) {
+                                    handleAutoScannedCard(line, 'SERIAL NFC');
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    break;
+                }
+            }
+        }
+
+        // =========================================================================
+        // TAB 4: LOCAL BRIDGE SERVER (PC/SC TANPA MENGUBAH DRIVER ZADIG)
+        // =========================================================================
+        let localBridgeEventSource = null;
+
+        function connectLocalBridge() {
+            if (localBridgeEventSource) {
+                localBridgeEventSource.close();
+                localBridgeEventSource = null;
+            }
+            const bridgeStatusEl = document.getElementById('bridgeStatusText');
+            const bridgeDotEl = document.getElementById('bridgeStatusDot');
+            bridgeStatusEl.textContent = 'Menghubungkan ke http://localhost:8080/events...';
+            bridgeDotEl.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+
+            try {
+                localBridgeEventSource = new EventSource('http://localhost:8080/events');
+                localBridgeEventSource.onopen = () => {
+                    bridgeDotEl.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
+                    bridgeStatusEl.textContent = 'Terhubung ke Local Bridge (8080)';
+                    showToast('Local Bridge PC/SC terhubung!');
+                };
+                localBridgeEventSource.onmessage = (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (data.uid) {
+                            playBeepSound('double');
+                            applyCardFromReader(data.uid, data.provider || 'KARTU PC/SC BRIDGE', data.balance || null);
+                        }
+                    } catch (err) {}
+                };
+                localBridgeEventSource.onerror = () => {
+                    bridgeDotEl.className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
+                    bridgeStatusEl.textContent = 'Tidak dapat terhubung. Jalankan "node bridge.js" di terminal.';
+                };
+            } catch (e) {
+                bridgeDotEl.className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+                bridgeStatusEl.textContent = 'Gagal membuat koneksi EventSource.';
+            }
+        }
+
+        // Terapkan hasil baca USB Reader ke dashboard utama
+        function applyCardFromReader(uidHex, providerLabel, parsedBalance) {
+            playBeepSound('double');
+            const cleanUid = uidHex.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+            const cardKey = 'card_' + cleanUid;
+            const formattedNum = cleanUid.match(/.{1,4}/g)?.join(' ') || cleanUid;
+
+            if (!cardsDatabase[cardKey]) {
+                const meta = detectCardMeta(cleanUid);
                 cardsDatabase[cardKey] = {
                     number: formattedNum,
-                    provider: providerLabel,
-                    theme: providerLabel.includes('FLAZZ')
+                    provider: providerLabel || meta.provider,
+                    theme: (providerLabel && providerLabel.includes('FLAZZ'))
                         ? 'from-blue-700 via-blue-800 to-indigo-950'
-                        : 'from-slate-800 via-slate-900 to-blue-950',
+                        : meta.theme,
                     balance: parsedBalance !== null ? parsedBalance : 0,
                     transactions: []
                 };
@@ -1192,10 +1690,11 @@
             }
 
             currentCardKey = cardKey;
+            saveCardsToStorage();
             document.getElementById('cardNumberInput').value = formattedNum;
             updateTimestamp();
             renderDashboard();
-            showToast(`Kartu terbaca dari USB Reader (${uidHex})`);
+            showToast(`Kartu terbaca dari USB Reader (${cleanUid})`);
         }
 
         // Salin Nomor Kartu
@@ -1242,7 +1741,14 @@
             }, 3500);
         }
 
-        // Inisialisasi awal (kondisi kosong)
+        // Inisialisasi awal: Muat kartu aktif terakhir dari localStorage jika ada
+        const savedLastCard = localStorage.getItem(LAST_CARD_KEY);
+        if (savedLastCard && cardsDatabase[savedLastCard]) {
+            currentCardKey = savedLastCard;
+            document.getElementById('cardNumberInput').value = cardsDatabase[savedLastCard].number;
+            updateTimestamp();
+        }
+
         renderDashboard();
     </script>
 </body>
